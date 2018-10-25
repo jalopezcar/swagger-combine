@@ -3,6 +3,7 @@ const SwaggerParser = require('swagger-parser');
 const traverse = require('traverse');
 const urlJoin = require('url-join');
 const _ = require('lodash');
+const replace = require('./replace');
 
 const operationTypes = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch'];
 
@@ -54,9 +55,18 @@ class SwaggerCombine {
               _.set(opts, 'resolve.http.headers.authorization', basicAuth);
             }
 
-            return $RefParser
-              .dereference(api.url, opts)
-              .then(res => SwaggerParser.dereference(res, opts))
+            let promise;
+            if (opts.noDereference) {
+               promise = $RefParser.parse(api.url, opts)
+                                   .then(res => replace(res, "$ref", (value) => {
+                                        return value.substring(value.indexOf("#"));
+                                      }));
+            } else {
+              promise = $RefParser
+                          .dereference(api.url, opts)
+                          .then(res => SwaggerParser.dereference(res, opts));
+            }
+            return promise
               .catch(err => {
                 if (this.opts.continueOnError) {
                   return;
