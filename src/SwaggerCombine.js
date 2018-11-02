@@ -22,6 +22,7 @@ class SwaggerCombine {
       .then(() => this.filterParameters())
       .then(() => this.renamePaths())
       .then(() => this.renameTags())
+      .then(() => this.renameDefinitions())    
       .then(() => this.addTags())
       .then(() => this.renameOperationIds())
       .then(() => this.renameSecurityDefinitions())
@@ -158,6 +159,35 @@ class SwaggerCombine {
     return this;
   }
 
+  renameDefinitions() {
+    this.schemas = this.schemas.map((schema, idx) => {
+      if (this.apis[idx].definitions && this.apis[idx].definitions.rename && Object.keys(this.apis[idx].definitions.rename).length > 0) {
+        let renamings;
+
+        if (_.isPlainObject(this.apis[idx].definitions.rename)) {
+          renamings = [];
+          _.forIn(this.apis[idx].definitions.rename, (renameDefinition, definitionToRename) => {
+            renamings.push({
+              type: 'rename',
+              from: definitionToRename,
+              to: renameDefinition,
+            });
+          });
+        } else {
+          renamings = this.apis[idx].definitions.rename;
+        }
+
+        _.forEach(renamings, renaming => {
+          schema.definitions = _.mapKeys(schema.definitions, (curPathValue, curPath) => this.rename(renaming, curPath));
+        });
+      }
+
+      return schema;
+    });
+
+    return this;
+  }
+  
   renamePaths() {
     this.schemas = this.schemas.map((schema, idx) => {
       if (this.apis[idx].paths && this.apis[idx].paths.rename && Object.keys(this.apis[idx].paths.rename).length > 0) {
@@ -278,6 +308,7 @@ class SwaggerCombine {
 
     return this;
   }
+
 
   addTags() {
     this.schemas = this.schemas.map((schema, idx) => {
