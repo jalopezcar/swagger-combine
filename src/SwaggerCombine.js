@@ -509,6 +509,10 @@ class SwaggerCombine {
         this.includeTerm(schema, 'parameters');
       }
 
+      if (this.opts.includeTags) {
+        this.addItems(schema, 'tags');
+      }
+
     });
 
     return this;
@@ -527,6 +531,11 @@ class SwaggerCombine {
     }
 
     _.defaultsDeep(this.combinedSchema, _.pick(schema, [term]));
+  }
+
+  // TODO handle conflicts
+  addItems(schema, term) {
+    this.combinedSchema[term] = (this.combinedSchema[term] || []).concat(schema[term])
   }
 
   removeEmptyFields() {
