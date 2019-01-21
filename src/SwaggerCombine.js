@@ -216,6 +216,13 @@ class SwaggerCombine {
 
         _.forEach(renamings, renaming => {
           schema.definitions = _.mapKeys(schema.definitions, (curPathValue, curPath) => this.rename(renaming, curPath));
+
+          const rename = this.rename.bind(this);
+          traverse(schema).forEach(function traverseSchema() {
+            if (this.key === '$ref' && this.node === `#/definitions/${renaming.from}`) {
+              this.update(`#/definitions/${renaming.to}`)
+            }
+          });
         });
       }
 
