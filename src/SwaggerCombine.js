@@ -23,6 +23,7 @@ class SwaggerCombine {
       .then(() => this.renamePaths())
       .then(() => this.renameTags())
       .then(() => this.renameDefinitions())    
+      .then(() => this.renameParameters())    
       .then(() => this.addTags())
       .then(() => this.renameOperationIds())
       .then(() => this.renameSecurityDefinitions())
@@ -37,7 +38,7 @@ class SwaggerCombine {
     return this.combine().then(() => this.combinedSchema);
   }
 
-  load() {
+  load() {  
     return $RefParser
       .dereference(this.config, this.opts)
       .then(configSchema => {
@@ -151,6 +152,42 @@ class SwaggerCombine {
             }
           });
         }
+      }
+
+      return schema;
+    });
+
+    return this;
+  }
+
+  renameParameters() {
+    this.schemas = this.schemas.map((schema, idx) => {
+      if (this.apis[idx].parameters && this.apis[idx].parameters.rename && Object.keys(this.apis[idx].parameters.rename).length > 0) {
+        let renamings;
+
+        if (_.isPlainObject(this.apis[idx].parameters.rename)) {
+          renamings = [];
+          _.forIn(this.apis[idx].parameters.rename, (renameParameter, parameterToRename) => {
+            renamings.push({
+              type: 'rename',
+              from: parameterToRename,
+              to: renameParameter,
+            });  
+          });
+        } else {
+          renamings = this.apis[idx].parameters.rename;
+        }
+
+        _.forEach(renamings, renaming => {
+          schema.parameters = _.mapKeys(schema.parameters, (curPathValue, curPath) => this.rename(renaming, curPath));
+
+          const rename = this.rename.bind(this);
+          traverse(schema).forEach(function traverseSchema() {
+            if (this.key === '$ref' && this.node === `#/parameters/${renaming.from}`) {
+              this.update(`#/parameters/${renaming.to}`)
+            }
+          });
+        });
       }
 
       return schema;
