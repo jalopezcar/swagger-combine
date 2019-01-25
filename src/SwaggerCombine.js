@@ -559,6 +559,10 @@ class SwaggerCombine {
 
     });
 
+    this.removeTagsNotUsed();
+    this.removeTermNotUsed('definitions');
+    this.removeTermNotUsed('parameters');
+
     return this;
   }
 
@@ -575,6 +579,55 @@ class SwaggerCombine {
     }
 
     _.defaultsDeep(this.combinedSchema, _.pick(schema, [term]));
+  }
+
+  
+
+  removeTermNotUsed(term) {
+    if (!this.combinedSchema[term]) {
+      return
+    }
+    const originalScheme = this.combinedSchema;
+    const newScheme = _.pickBy(this.combinedSchema, (value, key) => key !== term );
+    newScheme[term] = {};
+
+    const includeElement = (term, element, newScheme, originalScheme) => {
+      if (newScheme[term][element] !== undefined || originalScheme[term][element] === undefined) {
+        return;
+      }
+      newScheme[term][element] = originalScheme[term][element]; 
+      traverse(originalScheme[term][element]).forEach(function traverseSchema() { 
+        if (this.key === '$ref') {
+          const name = this.node.split("/").pop(-1);
+          includeElement(term, name, newScheme, originalScheme); 
+        }
+      });
+    };
+    traverse(newScheme).forEach(function traverseSchema() { 
+      if (this.key === '$ref') {
+        const name = this.node.split("/").pop(-1);
+        includeElement(term, name, newScheme, originalScheme);
+      }
+    });
+
+    // TODO fixme
+    const allOfs = _.pickBy(originalScheme[term], (value, key) => value["allOf"] !== undefined );
+    newScheme[term] = Object.assign(originalScheme[term], allOfs);
+
+    this.combinedSchema = newScheme;
+  }
+
+  removeTagsNotUsed() {
+    let tagsUsed = [];
+    traverse(this.combinedSchema.paths).forEach(function traverseSchema() { 
+      if (this.key === 'tags' && Array.isArray(this.node)) {
+        tagsUsed = tagsUsed.concat(this.node)
+      }
+    });
+    tagsUsed = _.uniq(tagsUsed);
+    if (this.combinedSchema.tags) {
+      this.combinedSchema.tags = this.combinedSchema.tags.filter(tag => tagsUsed.includes(tag.name));
+    }
   }
 
   // TODO handle conflicts
