@@ -391,7 +391,9 @@ class SwaggerCombine {
       ) {
         _.forIn(this.apis[idx].securityDefinitions.rename, (newName, curName) => {
           if (_.has(schema.securityDefinitions, curName)) {
-            _.set(schema.securityDefinitions, newName, schema.securityDefinitions[curName]);
+            // Comment this lie to fix https://github.groupondev.com/mobile/api-proxy-spec/issues/32
+            // We will rename the the securityDefinitions and set one in the global combined
+            //_.set(schema.securityDefinitions, newName, schema.securityDefinitions[curName]);
             _.unset(schema.securityDefinitions, curName);
 
             traverse(schema).forEach(function traverseSchema() {
