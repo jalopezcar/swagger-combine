@@ -4,6 +4,9 @@ const traverse = require('traverse');
 const urlJoin = require('url-join');
 const _ = require('lodash');
 const replace = require('./replace');
+const path = require('path');
+const isUrl = require('is-url');
+const { resolveRefs } = require('json-refs'); // 'json-refs' resolves local references better than 'json-schema-ref-parser'
 
 const operationTypes = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch'];
 
@@ -14,6 +17,7 @@ class SwaggerCombine {
     this.apis = [];
     this.schemas = [];
     this.combinedSchema = {};
+    this.cwd = process.cwd();
   }
 
   combine() {
@@ -56,13 +60,51 @@ class SwaggerCombine {
                 new Buffer(`${opts.resolve.http.auth.username}:${opts.resolve.http.auth.password}`).toString('base64');
               _.set(opts, 'resolve.http.headers.authorization', basicAuth);
             }
-
+            
             let promise;
             if (opts.noDereference) {
-               promise = $RefParser.parse(api.url, opts)
-                                   .then(res => replace(res, "$ref", (value) => {
-                                        return value.substring(value.indexOf("#"));
-                                      }));
+              // First we parse the spec from the url (local or remote)
+              promise = $RefParser.parse(api.url, opts)
+              if (isUrl(api.url)) {
+                // TODO: Figure out how to resolve all the references from a remote url.
+              } else {
+                // If api.url is a local path
+                // we need to resolve all the 
+                // local references (if there is any)
+                // inside the spec in order to get a
+                // single bundled spec file. 
+                promise = promise.then(res => {
+                                      const options = {
+                                        filter: 'relative',
+                                        loaderOptions: {
+                                          processContent: async (res, cb) => {
+                                            cb(null, this.parse(res.text));
+                                          },
+                                        },
+                                      };
+                                      // This is required to jump into the 
+                                      // directory where the spec is contained
+                                      // so we can resolve all the relative
+                                      // paths.                                
+                                      process.chdir(path.dirname(api.url));
+                                      return resolveRefs(res, options)
+                                            .then(res2 => {
+                                              // Going back to the
+                                              // current working directory.
+                                              process.chdir(this.cwd);
+                                              return res2.resolved;
+                                            });
+                                    });
+              }
+              // Once we have resolved all the local references we will
+              // get rid of any remote reference by just keeping the
+              // fragment (#) part of the URL. The reason why remote
+              // remote references are not resolved is to force those
+              // references to be added within the root swagger spec 
+              // as another API spec.
+              promise = promise.then(res => replace(res, "$ref", (value) => {
+                                  return value.substring(value.indexOf("#"));
+                                }));
             } else {
               promise = $RefParser
                           .dereference(api.url, opts)
@@ -651,6 +693,13 @@ class SwaggerCombine {
     }
 
     return JSON.stringify(this.combinedSchema, null, 2);
+  }
+
+  parse(text, format = this.opts.format) {
+    if (String(format).toLowerCase() === 'yaml' || String(format).toLowerCase() === 'yml') {
+      return $RefParser.YAML.parse(text);
+    }
+    return JSON.parse(text);
   }
 }
 
