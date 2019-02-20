@@ -75,6 +75,7 @@ class SwaggerCombine {
                 // single bundled spec file. 
                 promise = promise.then(res => {
                                       const options = {
+                                        location: api.url,
                                         filter: 'relative',
                                         loaderOptions: {
                                           processContent: async (res, cb) => {
@@ -85,13 +86,9 @@ class SwaggerCombine {
                                       // This is required to jump into the 
                                       // directory where the spec is contained
                                       // so we can resolve all the relative
-                                      // paths.                                
-                                      process.chdir(path.dirname(api.url));
+                                      // paths.   
                                       return resolveRefs(res, options)
                                             .then(res2 => {
-                                              // Going back to the
-                                              // current working directory.
-                                              process.chdir(this.cwd);
                                               return res2.resolved;
                                             });
                                     });
