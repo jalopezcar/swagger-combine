@@ -28,6 +28,7 @@ class SwaggerCombine {
       .then(() => this.renameTags())
       .then(() => this.renameDefinitions())    
       .then(() => this.renameParameters())    
+      .then(() => this.excludeParameters())    
       .then(() => this.addTags())
       .then(() => this.renameOperationIds())
       .then(() => this.renameSecurityDefinitions())
@@ -232,6 +233,22 @@ class SwaggerCombine {
       return schema;
     });
 
+    return this;
+  }
+
+  excludeParameters() {    
+    if (this.combinedSchema.parameters) {
+      const excludeParameters = Object.keys(this.combinedSchema.parameters);
+      this.schemas = this.schemas.map((schema, idx) => {
+        const allowGlobalOverride = (this.apis[idx].parameters && this.apis[idx].parameters.allowGlobalOverride) ? this.apis[idx].parameters.allowGlobalOverride : [];
+        excludeParameters.forEach(param => {
+          if (schema.parameters[param] !== undefined && allowGlobalOverride.includes(param)) {
+            delete schema.parameters[param];
+          }
+        });
+        return schema;
+      });    
+    }
     return this;
   }
 
